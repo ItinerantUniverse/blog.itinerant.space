@@ -94,5 +94,52 @@ the temperature should vary based on where you're standing, and of course it'll 
 https://worldbuilding.stackexchange.com/questions/185703/how-to-determine-planetary-extremes-of-temperature-from-average-global-temperatu
 
 This one I found really great, because it includes a way to figure out where the sun will be hitting based on axial tilt of the planet, and
-since my planets already have axial tilts on them, this gets really great.
+since my planets already have axial tilts on them, I thuoght it'd be amazing to try to combine everything I've learnt together.
 
+From that last link, I ended up writing three functions to help me determine how much energy falls on a particular part of the planet on a
+particulr day:
+
+        public double GetEffectiveLatitude(double actualLatitude, double yearRatio)
+        {
+            return actualLatitude + _planet.AxialTilt.Z * Math.Sin(yearRatio * 2 * Math.PI);
+        }
+
+        public double GetSolarPower(double actualLatitude, double yearRatio)
+        {
+            return Math.Abs(Math.Cos(GetEffectiveLatitude(actualLatitude, yearRatio)));
+        }
+
+        public double GetSolarPower(WGS84 pos, DateTime atTime)
+        {
+            TimeSpan t = atTime - DateTimeOffset.UnixEpoch;
+
+            return GetSolarPower(pos.LatitudeRadians(), _planet.OrbitalPeriod / t.TotalDays);
+        }
+
+I think I need to find a better name for it, but basically 'GetSolarPower' returns a value between 1 and 0, where 1 getting the full
+force of the sun's rays, and 0 is obviously getting nothing at all, because it's facing directly upwards relative to the star.
+
+[An improvement on this would be to also include the time of day, so the solar power falls away as the planet rotates - this is something
+I'll definitely add.]
+
+To test this is working, I overlaid my planet with color values to show how the power changes across the surface of the planet. In the
+image below, red represents the areas getting the most energy, and green the least:
+
+--
+
+I was amazed to see that it actually came out looking roughly right on a first try - usually i get these things wildly wrong first time
+and then have to spend hours trying to figure out what the issue is before finding I copied a formula down wrong somewhere!
+
+I then have this functino to determine a baseline temperature:
+
+        public double GetEquilibriumTemperature()
+        {
+            return Math.Pow(((1 - _albedo) * StarLuminosity()) / (16 * Math.PI * _emissivity * GenericPlanet.STEFAN_BOLTZMANN * Math.Pow(_planet.OrbitalDistance, 2)), 1 / 4.0);
+        }
+
+
+My plan is to use these formulas alongside something that makes a 'best guess' based on the type of atmosphere, presence of water
+on the surface and height of the terrain to generate some sort of heatmap that can be precalculated for every procedural planet.
+
+In this way, I think I'll be able to work out how temperature fluctuates between day and night, but also make smaller fluctuations based on
+cloud cover, weather conditions, etc.
